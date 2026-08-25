@@ -1,7 +1,7 @@
 import logging
 import time
 from typing import Optional, Dict, List
-from iqoptionapi.stable_api import IQOptionAPI
+from iqoptionapi.api import IQOptionAPI
 
 logger = logging.getLogger(__name__)
 

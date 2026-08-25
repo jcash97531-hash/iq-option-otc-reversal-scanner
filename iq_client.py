@@ -13,7 +13,7 @@ class IQOptionClient:
     """
 
     def __init__(self, email: str, password: str):
-        self.api = IQOptionAPI(username=email, password=password)
+        self.api = IQOptionAPI(username=email, password=password, host="iqoption.com")
         self.connected = False
 
     def connect(self) -> bool:

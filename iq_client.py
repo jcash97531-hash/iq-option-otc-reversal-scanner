@@ -13,13 +13,13 @@ class IQOptionClient:
     """
 
     def __init__(self, email: str, password: str):
-        self.api = IQOptionAPI(email=email, password=password, host="iqoption.com")
+        self.api = IQOptionAPI(username=email, password=password)
         self.connected = False
 
     def connect(self) -> bool:
         """Connect to IQ Option servers."""
         try:
-            check_result = self.api.check_connect()
+            check_result = self.api.connect()
             if check_result:
                 self.connected = True
                 logger.info("Connected to IQ Option")
@@ -34,7 +34,7 @@ class IQOptionClient:
     def disconnect(self):
         """Disconnect from IQ Option."""
         try:
-            self.api.logout()
+            self.api.close()
             self.connected = False
             logger.info("Disconnected from IQ Option")
         except Exception as e:
@@ -55,19 +55,19 @@ class IQOptionClient:
             or None if failed
         """
         try:
-            # IQ Option candle format
-            candles = self.api.get_candles(asset, timeframe, 2, time.time())
+            # IQ Option candle format - get last 2 candles, return the older one
+            candles = self.api.get_candles(asset, timeframe, 2)
             
             if candles and len(candles) > 0:
                 # Get the most recent completed candle (not the current one)
                 candle = candles[-2] if len(candles) >= 2 else candles[-1]
                 
                 return {
-                    "open": candle["open"],
-                    "close": candle["close"],
-                    "high": candle["max"],
-                    "low": candle["min"],
-                    "time": candle["from"]
+                    "open": candle.get("open") or candle.get("o"),
+                    "close": candle.get("close") or candle.get("c"),
+                    "high": candle.get("high") or candle.get("max") or candle.get("h"),
+                    "low": candle.get("low") or candle.get("min") or candle.get("l"),
+                    "time": candle.get("time") or candle.get("from")
                 }
             else:
                 logger.warning(f"No candles returned for {asset}")
@@ -92,17 +92,17 @@ class IQOptionClient:
             List of candle dicts or None if failed
         """
         try:
-            candles = self.api.get_candles(asset, timeframe, count + 1, time.time())
+            candles = self.api.get_candles(asset, timeframe, count + 1)
             
             if candles:
                 result = []
                 for candle in candles[:-1]:  # Exclude current incomplete candle
                     result.append({
-                        "open": candle["open"],
-                        "close": candle["close"],
-                        "high": candle["max"],
-                        "low": candle["min"],
-                        "time": candle["from"]
+                        "open": candle.get("open") or candle.get("o"),
+                        "close": candle.get("close") or candle.get("c"),
+                        "high": candle.get("high") or candle.get("max") or candle.get("h"),
+                        "low": candle.get("low") or candle.get("min") or candle.get("l"),
+                        "time": candle.get("time") or candle.get("from")
                     })
                 return result
             else:
@@ -116,9 +116,10 @@ class IQOptionClient:
     def get_asset_price(self, asset: str) -> Optional[float]:
         """Get current spot price for an asset."""
         try:
-            result = self.api.get_digital_spot_profit_margin(asset)
-            if result:
-                return result["bid"]
+            # For v0.5, we can get the latest candle and use close price
+            candle = self.get_candle(asset, 1)
+            if candle:
+                return candle["close"]
             return None
         except Exception as e:
             logger.error(f"Error getting price for {asset}: {e}")
@@ -126,4 +127,7 @@ class IQOptionClient:
 
     def is_connected(self) -> bool:
         """Check if still connected."""
-        return self.connected and self.api.check_connect()
+        try:
+            return self.connected and self.api.check_connect()
+        except:
+            return False
